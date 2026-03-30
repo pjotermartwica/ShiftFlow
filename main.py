@@ -9,7 +9,7 @@ import re as _re
 import openpyxl
 from dotenv import load_dotenv
 
-__version__ = "1.0.1"
+__version__ = "1.0.2"
 GITHUB_REPO = "pjotermartwica/ShiftFlow"
 
 # Wczytaj klucz API z pliku .env (bezpieczna alternatywa dla hardcoded klucza)
@@ -1951,7 +1951,7 @@ class ScheduleApp(QMainWindow):
 
 # --- PUNKT WEJŚCIA ---
 if __name__ == "__main__":
-    app = QApplication(sys.argv)
+    app = QApplication.instance() or QApplication(sys.argv)
     window = ScheduleApp()
     window.show()
     sys.exit(app.exec())
