@@ -13,6 +13,7 @@ venv/
 build/
 dist/
 *.spec.bak
+*.exe
 
 # IDE
 .vscode/
