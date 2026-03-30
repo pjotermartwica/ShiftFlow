@@ -24,7 +24,7 @@ sys.excepthook = _excepthook
 import openpyxl
 from dotenv import load_dotenv
 
-__version__ = "1.0.3"
+__version__ = "1.0.4"
 GITHUB_REPO = "pjotermartwica/ShiftFlow"
 
 # Wczytaj klucz API z pliku .env (bezpieczna alternatywa dla hardcoded klucza)
@@ -35,14 +35,9 @@ else:
 _env_path = os.path.join(_app_dir, ".env")
 load_dotenv(dotenv_path=_env_path)
 
-# Obsługa Google Gemini SDK: preferuj google.genai, fallback google.generativeai
-try:
-    import google.genai as genai
-except ModuleNotFoundError:
-    try:
-        import google.generativeai as genai
-    except ModuleNotFoundError:
-        raise ModuleNotFoundError("Brak pakietu google.genai i google.generativeai; zainstaluj jeden z nich: pip install google-genai lub pip install google-generativeai")
+# google.genai jest importowany leniwie w AIWorker.run() żeby uniknąć crash w PyInstaller
+genai = None
+genai_client = None
 from openpyxl.styles import PatternFill, Font
 from docx import Document
 from docx.shared import Inches, Pt, RGBColor
@@ -81,11 +76,6 @@ if not _api_key:
             "GEMINI_API_KEY=twój_klucz")
         sys.exit(1)
 os.environ["GEMINI_API_KEY"] = _api_key
-try:
-    genai.configure(api_key=_api_key)
-except AttributeError:
-    from google.genai import Client
-    genai_client = Client(api_key=_api_key)
 
 # --- KONFIGURACJA DNI I LOKALIZACJI ---
 DAYS_CONFIG = {
@@ -805,6 +795,23 @@ class AIWorker(QThread):
     
     def run(self):
         try:
+            # Lazy import google.genai (unika crash w PyInstaller)
+            try:
+                import google.genai as genai
+            except ModuleNotFoundError:
+                try:
+                    import google.generativeai as genai
+                except ModuleNotFoundError:
+                    self.error_occurred.emit("Brak pakietu google.genai; pip install google-genai")
+                    return
+
+            # Configure SDK
+            _api_key = os.environ.get("GEMINI_API_KEY", "")
+            try:
+                genai.configure(api_key=_api_key)
+            except AttributeError:
+                pass  # new SDK doesn't use configure()
+
             # Detect which SDK is being used
             _use_new_sdk = not hasattr(genai, 'GenerativeModel')
 
