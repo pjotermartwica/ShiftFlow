@@ -10,7 +10,7 @@ import openpyxl
 from dotenv import load_dotenv
 
 __version__ = "1.0.0"
-GITHUB_REPO = "piotr/ShiftFlow"   # <-- zmień na swoje owner/repo
+GITHUB_REPO = "pjotermartwica/ShiftFlow"
 
 # Wczytaj klucz API z pliku .env (bezpieczna alternatywa dla hardcoded klucza)
 _env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
@@ -1117,8 +1117,9 @@ class ScheduleApp(QMainWindow):
         # --- Auto-update check (w tle) ---
         self._update_checker = UpdateChecker()
         self._update_checker.update_available.connect(self._on_update_available)
+        # 404 = repo nie istnieje jeszcze — cicho ignoruj
         self._update_checker.check_failed.connect(
-            lambda e: self._log(f"Sprawdzanie aktualizacji: {e}"))
+            lambda e: None if "404" in str(e) else self._log(f"Sprawdzanie aktualizacji: {e}"))
         self._update_checker.start()
     
     def _setup_ui(self):
