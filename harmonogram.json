@@ -1,0 +1,353 @@
+{
+  "headers": [
+    "Pracownik",
+    "Poniedziałek|SP-1",
+    "Poniedziałek|SP-2",
+    "Poniedziałek|SP-1/2",
+    "Wtorek|SP-1",
+    "Wtorek|SP-2",
+    "Wtorek|SP-1/2",
+    "Środa|SP-1",
+    "Środa|SP-2",
+    "Środa|SP-1/2",
+    "Czwartek|SP-1",
+    "Czwartek|SP-2",
+    "Czwartek|SP-1/2",
+    "Piątek|SP-1",
+    "Piątek|SP-2",
+    "Piątek|SP-1/2"
+  ],
+  "rows": [
+    [
+      {
+        "value": "Beata Sadkowska",
+        "color": "#B0BEC5"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      }
+    ],
+    [
+      {
+        "value": "Grzegorz Woźniak",
+        "color": "#B0BEC5"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      }
+    ],
+    [
+      {
+        "value": "Irena Zakrzewska",
+        "color": "#000000"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      }
+    ],
+    [
+      {
+        "value": "Jolanta Mokulska",
+        "color": "#000000"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      }
+    ],
+    [
+      {
+        "value": "Justyna Kozioł",
+        "color": "#000000"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      },
+      {
+        "value": "",
+        "color": "#FFFFFF"
+      }
+    ]
+  ],
+  "spans": []
+}

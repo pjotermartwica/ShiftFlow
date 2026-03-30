@@ -1,0 +1,34 @@
+{
+  "departments": {
+    "Szkoła": {
+      "num_people": 30,
+      "num_days": 5,
+      "shifts_per_day": 2
+    },
+    "Przedszkole": {
+      "num_people": 14,
+      "num_days": 5,
+      "shifts_per_day": 2
+    },
+    "Świetlica": {
+      "num_people": 4,
+      "num_days": 5,
+      "shifts_per_day": 2
+    }
+  },
+  "shift_metadata": {
+    "Poranna": {
+      "color": "#4CAF50",
+      "bold": true
+    },
+    "Popołudniowa": {
+      "color": "#2196F3",
+      "bold": false
+    }
+  },
+  "employee_preferences": {
+    "0": [0],
+    "1": [1],
+    "2": [0, 1]
+  }
+}
