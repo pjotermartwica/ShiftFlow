@@ -14,6 +14,7 @@ build/
 dist/
 *.spec.bak
 *.exe
+build_log.txt
 
 # IDE
 .vscode/

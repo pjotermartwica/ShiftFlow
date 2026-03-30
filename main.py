@@ -22,18 +22,71 @@ def _excepthook(etype, value, tb):
 sys.excepthook = _excepthook
 
 import openpyxl
-from dotenv import load_dotenv
+from dotenv import dotenv_values
 
 __version__ = "1.0.5"
 GITHUB_REPO = "pjotermartwica/ShiftFlow"
 
-# Wczytaj klucz API z pliku .env (bezpieczna alternatywa dla hardcoded klucza)
-if getattr(sys, 'frozen', False):
-    _app_dir = os.path.dirname(sys.executable)
-else:
-    _app_dir = os.path.dirname(os.path.abspath(__file__))
-_env_path = os.path.join(_app_dir, ".env")
-load_dotenv(dotenv_path=_env_path)
+def _collect_env_paths():
+    seen_dirs = set()
+    env_paths = []
+
+    def _add_dir(path):
+        if not path:
+            return
+        abs_path = os.path.abspath(path)
+        if not os.path.isdir(abs_path) or abs_path in seen_dirs:
+            return
+        seen_dirs.add(abs_path)
+        env_paths.append(os.path.join(abs_path, ".env"))
+
+    if getattr(sys, 'frozen', False):
+        exe_dir = os.path.dirname(os.path.abspath(sys.executable))
+        _add_dir(exe_dir)
+        _add_dir(os.path.dirname(exe_dir))
+
+    _add_dir(os.getcwd())
+    _add_dir(os.path.dirname(os.path.abspath(__file__)))
+
+    if sys.argv and sys.argv[0]:
+        argv_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
+        _add_dir(argv_dir)
+        _add_dir(os.path.dirname(argv_dir))
+
+    local_appdata = os.environ.get("LOCALAPPDATA", "").strip()
+    if local_appdata:
+        _add_dir(os.path.join(local_appdata, "ShiftFlow"))
+
+    return env_paths
+
+
+_ENV_SEARCH_PATHS = _collect_env_paths()
+_PREFERRED_ENV_PATH = _ENV_SEARCH_PATHS[0] if _ENV_SEARCH_PATHS else os.path.join(os.getcwd(), ".env")
+
+
+def _refresh_gemini_api_key():
+    current_key = os.environ.get("GEMINI_API_KEY", "").strip()
+    if current_key:
+        return current_key, None, []
+
+    invalid_env_paths = []
+    for env_path in _ENV_SEARCH_PATHS:
+        if not os.path.isfile(env_path):
+            continue
+        try:
+            env_values = dotenv_values(env_path)
+        except Exception:
+            invalid_env_paths.append(env_path)
+            continue
+
+        file_key = (env_values.get("GEMINI_API_KEY") or "").strip()
+        if file_key:
+            os.environ["GEMINI_API_KEY"] = file_key
+            return file_key, env_path, invalid_env_paths
+
+        invalid_env_paths.append(env_path)
+
+    return "", None, invalid_env_paths
 
 # google.genai jest importowany leniwie w AIWorker.run() żeby uniknąć crash w PyInstaller
 genai = None
@@ -55,7 +108,7 @@ import qdarkstyle
 
 # --- KONFIGURACJA GEMINI ---
 # Klucz API jest opcjonalny przy starcie aplikacji; wymagany dopiero przy użyciu AI.
-_api_key = os.getenv("GEMINI_API_KEY")
+_api_key, _loaded_env_path, _invalid_env_paths = _refresh_gemini_api_key()
 if _api_key:
     os.environ["GEMINI_API_KEY"] = _api_key
 
@@ -777,13 +830,29 @@ class AIWorker(QThread):
     
     def run(self):
         try:
-            _api_key = os.environ.get("GEMINI_API_KEY", "").strip()
+            _api_key, _loaded_env_path, _invalid_env_paths = _refresh_gemini_api_key()
             if not _api_key:
+                if _invalid_env_paths:
+                    checked_path = _invalid_env_paths[0]
+                    message = (
+                        "Brak poprawnego klucza GEMINI_API_KEY.\n\n"
+                        f"Znaleziono plik .env w: {checked_path}\n"
+                        "ale nie zawiera on poprawnej wartości GEMINI_API_KEY.\n\n"
+                        f"Popraw plik i wpisz: GEMINI_API_KEY=twój_klucz\n"
+                        "Następnie spróbuj ponownie."
+                    )
+                else:
+                    checked_locations = "\n".join(f"- {path}" for path in _ENV_SEARCH_PATHS[:5])
+                    message = (
+                        "Brak klucza GEMINI_API_KEY.\n\n"
+                        "Aplikacja szukała pliku .env w lokalizacjach:\n"
+                        f"{checked_locations}\n\n"
+                        f"Utwórz plik .env w: {_PREFERRED_ENV_PATH}\n"
+                        "z treścią: GEMINI_API_KEY=twój_klucz\n\n"
+                        "Następnie spróbuj ponownie."
+                    )
                 self.error_occurred.emit(
-                    "Brak klucza GEMINI_API_KEY.\n\n"
-                    f"Utwórz plik .env w: {_env_path}\n"
-                    "z treścią: GEMINI_API_KEY=twój_klucz\n\n"
-                    "Następnie uruchom ponownie aplikację."
+                    message
                 )
                 return
 
