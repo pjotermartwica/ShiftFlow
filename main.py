@@ -627,7 +627,7 @@ class ScheduleTableModel(QAbstractTableModel):
 
             if action == "add_worker":
                 num = len(self.rows) + 1
-                new_row = [Cell(f"Pracownik {num}") if i == 0
+                new_row = [Cell(f"Pracownik {num}") if i == 0 
                            else Cell("") for i in range(len(self.headers))]
                 self.rows.append(new_row)
             elif action == "remove_worker":
