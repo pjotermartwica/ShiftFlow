@@ -24,7 +24,7 @@ sys.excepthook = _excepthook
 import openpyxl
 from dotenv import load_dotenv
 
-__version__ = "1.0.4"
+__version__ = "1.0.5"
 GITHUB_REPO = "pjotermartwica/ShiftFlow"
 
 # Wczytaj klucz API z pliku .env (bezpieczna alternatywa dla hardcoded klucza)
@@ -54,28 +54,10 @@ from PySide6.QtCore import QUrl
 import qdarkstyle
 
 # --- KONFIGURACJA GEMINI ---
+# Klucz API jest opcjonalny przy starcie aplikacji; wymagany dopiero przy użyciu AI.
 _api_key = os.getenv("GEMINI_API_KEY")
-if not _api_key:
-    # Spróbuj poprosić użytkownika o klucz (przy pierwszym uruchomieniu)
-    _tmp_app = QApplication.instance() or QApplication(sys.argv)
-    _key, _ok = QInputDialog.getText(
-        None, "Klucz API Gemini",
-        "Brak klucza GEMINI_API_KEY.\n\n"
-        "Wklej swój klucz API z Google AI Studio\n"
-        "(https://aistudio.google.com/apikey):",
-        QLineEdit.EchoMode.Normal)
-    if _ok and _key.strip():
-        _api_key = _key.strip()
-        # Zapisz do .env żeby nie pytać ponownie
-        with open(_env_path, "w", encoding="utf-8") as _f:
-            _f.write(f"GEMINI_API_KEY={_api_key}\n")
-    else:
-        QMessageBox.critical(None, "Brak klucza",
-            "Aplikacja wymaga klucza GEMINI_API_KEY.\n"
-            "Utwórz plik .env obok ShiftFlow.exe z treścią:\n\n"
-            "GEMINI_API_KEY=twój_klucz")
-        sys.exit(1)
-os.environ["GEMINI_API_KEY"] = _api_key
+if _api_key:
+    os.environ["GEMINI_API_KEY"] = _api_key
 
 # --- KONFIGURACJA DNI I LOKALIZACJI ---
 DAYS_CONFIG = {
@@ -795,6 +777,16 @@ class AIWorker(QThread):
     
     def run(self):
         try:
+            _api_key = os.environ.get("GEMINI_API_KEY", "").strip()
+            if not _api_key:
+                self.error_occurred.emit(
+                    "Brak klucza GEMINI_API_KEY.\n\n"
+                    f"Utwórz plik .env w: {_env_path}\n"
+                    "z treścią: GEMINI_API_KEY=twój_klucz\n\n"
+                    "Następnie uruchom ponownie aplikację."
+                )
+                return
+
             # Lazy import google.genai (unika crash w PyInstaller)
             try:
                 import google.genai as genai
@@ -806,7 +798,6 @@ class AIWorker(QThread):
                     return
 
             # Configure SDK
-            _api_key = os.environ.get("GEMINI_API_KEY", "")
             try:
                 genai.configure(api_key=_api_key)
             except AttributeError:
