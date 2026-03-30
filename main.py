@@ -6,10 +6,25 @@ import time
 import tempfile
 import subprocess
 import re as _re
+
+# Globalny hook dla nieobsłużonych wyjątków (widoczny w .exe bez konsoli)
+def _excepthook(etype, value, tb):
+    import traceback
+    msg = "".join(traceback.format_exception(etype, value, tb))
+    try:
+        from PySide6.QtWidgets import QApplication, QMessageBox
+        _a = QApplication.instance() or QApplication(sys.argv)
+        QMessageBox.critical(None, "Błąd krytyczny", msg)
+    except Exception:
+        pass
+    sys.__excepthook__(etype, value, tb)
+    sys.exit(1)
+sys.excepthook = _excepthook
+
 import openpyxl
 from dotenv import load_dotenv
 
-__version__ = "1.0.2"
+__version__ = "1.0.3"
 GITHUB_REPO = "pjotermartwica/ShiftFlow"
 
 # Wczytaj klucz API z pliku .env (bezpieczna alternatywa dla hardcoded klucza)
@@ -1952,6 +1967,12 @@ class ScheduleApp(QMainWindow):
 # --- PUNKT WEJŚCIA ---
 if __name__ == "__main__":
     app = QApplication.instance() or QApplication(sys.argv)
-    window = ScheduleApp()
-    window.show()
-    sys.exit(app.exec())
+    try:
+        window = ScheduleApp()
+        window.show()
+        sys.exit(app.exec())
+    except Exception as exc:
+        import traceback
+        tb = traceback.format_exc()
+        QMessageBox.critical(None, "Błąd krytyczny", f"{exc}\n\n{tb}")
+        sys.exit(1)
