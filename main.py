@@ -56,7 +56,7 @@ sys.excepthook = _excepthook
 import openpyxl
 from dotenv import dotenv_values
 
-__version__ = "1.0.8"
+__version__ = "1.0.9"
 GITHUB_REPO = "pjotermartwica/ShiftFlow"
 
 def _collect_env_paths():
