@@ -131,9 +131,9 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QTableView, QVBoxLayou
                              QWidget, QPushButton, QDockWidget, QTextEdit, QLineEdit,
                              QHeaderView, QFileDialog, QMessageBox, QLabel, QTabWidget,
                              QStatusBar, QMenu, QColorDialog, QInputDialog,
-                             QProgressDialog, QShortcut)
+                             QProgressDialog)
 from PySide6.QtCore import Qt, QAbstractTableModel, QModelIndex, QThread, Signal, QSize, QPoint, QRect
-from PySide6.QtGui import QColor, QFont, QUndoStack, QUndoCommand, QPainter, QKeyEvent, QKeySequence
+from PySide6.QtGui import QColor, QFont, QUndoStack, QUndoCommand, QPainter, QKeyEvent, QKeySequence, QShortcut
 from PySide6.QtNetwork import QNetworkAccessManager, QNetworkRequest, QNetworkReply
 from PySide6.QtCore import QUrl
 import qdarkstyle
@@ -1161,7 +1161,7 @@ class ScriptUpdater(QThread):
                 headers={"User-Agent": "ShiftFlow-Updater"},
             )
             with urllib.request.urlopen(req, timeout=8) as r:
-                remote_ver = r.read().decode().strip()
+                remote_ver = r.read().decode("utf-8-sig").strip()
 
             def _parts(v: str) -> list:
                 return [int(x) for x in _re.findall(r"\d+", v)]

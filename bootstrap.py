@@ -109,7 +109,7 @@ def _fetch_remote_version() -> str | None:
             headers={"User-Agent": "ShiftFlow-Bootstrap"},
         )
         with urllib.request.urlopen(req, timeout=5) as r:
-            return r.read().decode().strip()
+            return r.read().decode("utf-8-sig").strip()
     except Exception:
         return None
 
