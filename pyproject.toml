@@ -1,0 +1,7 @@
+[tool.ruff]
+fix = true
+show-source = true
+[tool.ruff.lint]
+select = ["E", "W"]
+[tool.ruff.format]
+select = ["I"]
