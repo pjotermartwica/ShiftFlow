@@ -56,7 +56,7 @@ sys.excepthook = _excepthook
 import openpyxl
 from dotenv import dotenv_values
 
-__version__ = "1.0.5"
+__version__ = "1.0.7"
 GITHUB_REPO = "pjotermartwica/ShiftFlow"
 
 def _collect_env_paths():
@@ -2152,17 +2152,21 @@ class ScheduleApp(QMainWindow):
         self._script_updater.start()
 
     def _on_script_updated(self, new_ver: str):
-        self._log(f"✓ Zaktualizowano do v{new_ver} — zrestartuj aplikację, by wczytać zmiany.")
+        self._log(f"✓ Zaktualizowano do v{new_ver} — restartuję aplikację.")
         self.set_ai_status("Aktualizacja gotowa — restart!", "#FFA500")
-        self.statusBar().showMessage(
-            f"ShiftFlow v{new_ver} gotowa — zamknij i otwórz ponownie.", 0)
-        reply = QMessageBox.information(
+        reply = QMessageBox.question(
             self,
             "Aktualizacja gotowa",
             f"Pobrano ShiftFlow v{new_ver}.\n"
-            "Zamknij i uruchom aplikację ponownie, by zastosować zmiany.",
-            QMessageBox.Ok,
+            "Aplikacja uruchomi się ponownie, by zastosować zmiany.\n\n"
+            "Czy chcesz teraz zrestartować?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.Yes,
         )
+        if reply == QMessageBox.Yes:
+            import subprocess
+            subprocess.Popen([sys.executable] + sys.argv)
+            QApplication.quit()
 
     def _on_script_up_to_date(self, ver: str):
         self._log(f"✓ Wersja v{ver} jest aktualna.")
