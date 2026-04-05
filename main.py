@@ -56,7 +56,7 @@ sys.excepthook = _excepthook
 import openpyxl
 from dotenv import dotenv_values
 
-__version__ = "1.0.11"
+__version__ = "1.0.12"
 GITHUB_REPO = "pjotermartwica/ShiftFlow"
 
 def _collect_env_paths():
@@ -131,7 +131,7 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QTableView, QVBoxLayou
                              QWidget, QPushButton, QDockWidget, QTextEdit, QLineEdit,
                              QHeaderView, QFileDialog, QMessageBox, QLabel, QTabWidget,
                              QStatusBar, QMenu, QColorDialog, QInputDialog,
-                             QProgressDialog, QScrollArea)
+                             QProgressDialog, QScrollArea, QLayout)
 from PySide6.QtCore import Qt, QAbstractTableModel, QModelIndex, QThread, Signal, QSize, QPoint, QRect
 from PySide6.QtGui import QColor, QFont, QUndoStack, QUndoCommand, QPainter, QKeyEvent, QKeySequence, QShortcut
 from PySide6.QtNetwork import QNetworkAccessManager, QNetworkRequest, QNetworkReply
@@ -1281,8 +1281,11 @@ class ScheduleApp(QMainWindow):
         dock = QDockWidget("Panel Kontrolny", self)
         dock_scroll = QScrollArea()
         dock_scroll.setWidgetResizable(True)
+        dock_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        dock_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         dock_widget = QWidget()
         dock_layout = QVBoxLayout(dock_widget)
+        dock_layout.setSizeConstraint(QLayout.SetMinAndMaxSize)
 
         # ── PLIK / ZAPIS I ODCZYT ─────────────────────────────────────────
         dock_layout.addWidget(QLabel("--- PLIK ---"))
