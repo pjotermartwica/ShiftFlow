@@ -56,7 +56,7 @@ sys.excepthook = _excepthook
 import openpyxl
 from dotenv import dotenv_values
 
-__version__ = "1.0.10"
+__version__ = "1.0.11"
 GITHUB_REPO = "pjotermartwica/ShiftFlow"
 
 def _collect_env_paths():
@@ -131,7 +131,7 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QTableView, QVBoxLayou
                              QWidget, QPushButton, QDockWidget, QTextEdit, QLineEdit,
                              QHeaderView, QFileDialog, QMessageBox, QLabel, QTabWidget,
                              QStatusBar, QMenu, QColorDialog, QInputDialog,
-                             QProgressDialog)
+                             QProgressDialog, QScrollArea)
 from PySide6.QtCore import Qt, QAbstractTableModel, QModelIndex, QThread, Signal, QSize, QPoint, QRect
 from PySide6.QtGui import QColor, QFont, QUndoStack, QUndoCommand, QPainter, QKeyEvent, QKeySequence, QShortcut
 from PySide6.QtNetwork import QNetworkAccessManager, QNetworkRequest, QNetworkReply
@@ -1279,6 +1279,8 @@ class ScheduleApp(QMainWindow):
         
         # Boczny panel (DockWidget)
         dock = QDockWidget("Panel Kontrolny", self)
+        dock_scroll = QScrollArea()
+        dock_scroll.setWidgetResizable(True)
         dock_widget = QWidget()
         dock_layout = QVBoxLayout(dock_widget)
 
@@ -1425,8 +1427,9 @@ class ScheduleApp(QMainWindow):
         dock_layout.addWidget(btn_check_update)
 
         dock_layout.addStretch()
-        
-        dock.setWidget(dock_widget)
+
+        dock_scroll.setWidget(dock_widget)
+        dock.setWidget(dock_scroll)
         self.addDockWidget(Qt.RightDockWidgetArea, dock)
         
         self._log("Aplikacja uruchomiona ✓")
