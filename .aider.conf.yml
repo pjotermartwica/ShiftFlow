@@ -1,1 +1,3 @@
 model: groq/llama-3.3-70b-versatile
+model: groq/llama-3.3-70b-versatile
+auto-commit: true
