@@ -146,12 +146,12 @@ if _api_key:
 
 
 def _load_app_config() -> dict:
-    """Wczytaj config.json z katalogu EXE lub CWD."""
+    """Wczytaj config.json; preferuj runtime CWD (APP_DIR) nad katalogiem EXE."""
     for candidate in [
+        os.path.join(os.getcwd(), "config.json"),
         os.path.join(os.path.dirname(os.path.abspath(
             sys.executable if getattr(sys, 'frozen', False) else __file__
         )), "config.json"),
-        os.path.join(os.getcwd(), "config.json"),
     ]:
         if os.path.isfile(candidate):
             try:
@@ -164,6 +164,18 @@ def _load_app_config() -> dict:
 
 _APP_CONFIG: dict = _load_app_config()
 _GRAFIK_FILTER = "Pliki grafiku (*.grafik);;JSON (*.json);;Wszystkie pliki (*)"
+
+
+def _config_bool(value, default: bool) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        val = value.strip().lower()
+        if val in {"1", "true", "yes", "on", "tak"}:
+            return True
+        if val in {"0", "false", "no", "off", "nie"}:
+            return False
+    return default
 
 # --- KONFIGURACJA DNI I LOKALIZACJI ---
 DAYS_CONFIG = {
@@ -2189,7 +2201,7 @@ if __name__ == "__main__":
     app = QApplication.instance() or QApplication(sys.argv)
     try:
         window = ScheduleApp()
-        if _APP_CONFIG.get("start_maximized", True):
+        if _config_bool(_APP_CONFIG.get("start_maximized", True), True):
             window.showMaximized()
         else:
             window.show()
