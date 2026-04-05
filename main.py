@@ -56,7 +56,7 @@ sys.excepthook = _excepthook
 import openpyxl
 from dotenv import dotenv_values
 
-__version__ = "1.0.7"
+__version__ = "1.0.8"
 GITHUB_REPO = "pjotermartwica/ShiftFlow"
 
 def _collect_env_paths():
@@ -2164,8 +2164,7 @@ class ScheduleApp(QMainWindow):
             QMessageBox.Yes,
         )
         if reply == QMessageBox.Yes:
-            import subprocess
-            subprocess.Popen([sys.executable] + sys.argv)
+            subprocess.Popen([sys.executable])
             QApplication.quit()
 
     def _on_script_up_to_date(self, ver: str):
