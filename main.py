@@ -11,14 +11,46 @@ import re as _re
 def _excepthook(etype, value, tb):
     import traceback
     msg = "".join(traceback.format_exception(etype, value, tb))
+
+    # Zawsze zapisz do logu — działa nawet gdy Qt nie wystartowało
+    try:
+        import os, datetime
+        _log_dir = os.path.join(
+            os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), "ShiftFlow"
+        )
+        os.makedirs(_log_dir, exist_ok=True)
+        _log_path = os.path.join(_log_dir, "shiftflow_log.txt")
+        ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with open(_log_path, "a", encoding="utf-8") as _f:
+            _f.write(f"[{ts}] UNCAUGHT EXCEPTION:\n{msg}\n")
+    except Exception:
+        pass
+
+    # Próbuj pokazać QMessageBox; jeśli Qt nie działa — użyj tkinter
+    _shown = False
     try:
         from PySide6.QtWidgets import QApplication, QMessageBox
         _a = QApplication.instance() or QApplication(sys.argv)
         QMessageBox.critical(None, "Błąd krytyczny", msg)
+        _shown = True
     except Exception:
         pass
+
+    if not _shown:
+        try:
+            import tkinter as tk
+            from tkinter import messagebox
+            _r = tk.Tk(); _r.withdraw()
+            messagebox.showerror("ShiftFlow — błąd krytyczny",
+                                 f"{value}\n\nSzczegóły w logu:\n"
+                                 f"%LOCALAPPDATA%\\ShiftFlow\\shiftflow_log.txt")
+            _r.destroy()
+        except Exception:
+            pass
+
     sys.__excepthook__(etype, value, tb)
     sys.exit(1)
+
 sys.excepthook = _excepthook
 
 import openpyxl

@@ -29,6 +29,38 @@ _APP_DIR = os.path.join(
 _LOCAL_SCRIPT  = os.path.join(_APP_DIR, "main.py")
 _LOCAL_VER     = os.path.join(_APP_DIR, "version.txt")
 _LOCAL_CFG     = os.path.join(_APP_DIR, "config.json")
+_LOG_FILE      = os.path.join(_APP_DIR, "shiftflow_log.txt")
+
+
+# ---------------------------------------------------------------------------
+# Logging do pliku (działa PRZED inicjalizacją Qt)
+# ---------------------------------------------------------------------------
+
+def _log(msg: str) -> None:
+    """Zapisz linię do shiftflow_log.txt. Nigdy nie rzuca wyjątków."""
+    try:
+        os.makedirs(_APP_DIR, exist_ok=True)
+        import datetime
+        ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with open(_LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(f"[{ts}] {msg}\n")
+    except Exception:
+        pass
+
+
+def _fatal(title: str, msg: str) -> None:
+    """Pokaż błąd krytyczny (tkinter, bo PySide6 może nie działać) i zakończ."""
+    _log(f"FATAL: {title}: {msg}")
+    try:
+        import tkinter as tk
+        from tkinter import messagebox
+        r = tk.Tk()
+        r.withdraw()
+        messagebox.showerror(title, f"{msg}\n\nSzczegóły w:\n{_LOG_FILE}")
+        r.destroy()
+    except Exception:
+        pass
+    sys.exit(1)
 
 
 # ---------------------------------------------------------------------------
@@ -138,34 +170,40 @@ def _get_script_path() -> str:
 
 def main() -> None:
     os.makedirs(_APP_DIR, exist_ok=True)
+    _log("=" * 60)
+    _log(f"Bootstrap start  |  Python {sys.version}  |  frozen={getattr(sys,'frozen',False)}")
+    _log(f"APP_DIR: {_APP_DIR}")
+
     _ensure_default_files()
 
     # Ustaw CWD na APP_DIR: harmonogram.json, config.json, brain_memory.json
     # będą zapisywane obok siebie, a nie obok .exe (która może być gdzie indziej).
     os.chdir(_APP_DIR)
+    _log(f"CWD ustawione na: {_APP_DIR}")
 
     # --- Cicha aktualizacja skryptu ---
-    remote_ver = _fetch_remote_version()
-    if remote_ver:
-        local_ver = _read_local_version()
-        if _ver_parts(remote_ver) > _ver_parts(local_ver):
-            _download_script(remote_ver)   # ~100 KB, <1 s na LAN
+    try:
+        remote_ver = _fetch_remote_version()
+        if remote_ver:
+            local_ver = _read_local_version()
+            _log(f"Wersja: lokalna={local_ver}  zdalna={remote_ver}")
+            if _ver_parts(remote_ver) > _ver_parts(local_ver):
+                ok = _download_script(remote_ver)
+                _log(f"Pobieranie skryptu: {'OK' if ok else 'BLAD'}")
+        else:
+            _log("Brak sieci lub GitHub niedostepny — pomijam aktualizacje")
+    except Exception as e:
+        _log(f"Blad aktualizacji (niekrytyczny): {e}")
 
     # --- Uruchom main.py w tym samym procesie ---
     script = _get_script_path()
+    _log(f"Uruchamiam skrypt: {script}  |  istnieje={os.path.isfile(script)}")
 
-    # Jeśli z jakiegoś powodu skrypt nie istnieje — bail out
     if not os.path.isfile(script):
-        import tkinter as tk
-        from tkinter import messagebox
-        _r = tk.Tk()
-        _r.withdraw()
-        messagebox.showerror(
-            "ShiftFlow",
-            f"Nie znaleziono main.py:\n{script}\n\n"
-            "Zainstaluj ponownie aplikację.",
+        _fatal(
+            "ShiftFlow — brak skryptu",
+            f"Nie znaleziono main.py:\n{script}\n\nZainstaluj ponownie aplikację.",
         )
-        sys.exit(1)
 
     globs: dict = {
         "__file__": script,
@@ -173,9 +211,23 @@ def main() -> None:
         "__spec__": None,
         "__builtins__": __builtins__,
     }
-    with open(script, "r", encoding="utf-8") as f:
-        src = f.read()
-    exec(compile(src, script, "exec"), globs)  # noqa: S102
+    try:
+        with open(script, "r", encoding="utf-8") as f:
+            src = f.read()
+        _log("exec() main.py — start")
+        exec(compile(src, script, "exec"), globs)  # noqa: S102
+        _log("exec() main.py — zakonczone normalnie")
+    except SystemExit:
+        # Normalne wyjście przez sys.exit() — nie loguj jako błąd
+        raise
+    except Exception as exc:
+        import traceback
+        tb = traceback.format_exc()
+        _log(f"WYJATEK w main.py:\n{tb}")
+        _fatal(
+            "ShiftFlow — błąd krytyczny",
+            f"{exc}\n\nSzczegóły w logu:\n{_LOG_FILE}",
+        )
 
 
 if __name__ == "__main__":
