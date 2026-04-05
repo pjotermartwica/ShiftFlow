@@ -99,9 +99,9 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QTableView, QVBoxLayou
                              QWidget, QPushButton, QDockWidget, QTextEdit, QLineEdit,
                              QHeaderView, QFileDialog, QMessageBox, QLabel, QTabWidget,
                              QStatusBar, QMenu, QColorDialog, QInputDialog,
-                             QProgressDialog)
+                             QProgressDialog, QShortcut)
 from PySide6.QtCore import Qt, QAbstractTableModel, QModelIndex, QThread, Signal, QSize, QPoint, QRect
-from PySide6.QtGui import QColor, QFont, QUndoStack, QUndoCommand, QPainter, QKeyEvent
+from PySide6.QtGui import QColor, QFont, QUndoStack, QUndoCommand, QPainter, QKeyEvent, QKeySequence
 from PySide6.QtNetwork import QNetworkAccessManager, QNetworkRequest, QNetworkReply
 from PySide6.QtCore import QUrl
 import qdarkstyle
@@ -111,6 +111,27 @@ import qdarkstyle
 _api_key, _loaded_env_path, _invalid_env_paths = _refresh_gemini_api_key()
 if _api_key:
     os.environ["GEMINI_API_KEY"] = _api_key
+
+
+def _load_app_config() -> dict:
+    """Wczytaj config.json z katalogu EXE lub CWD."""
+    for candidate in [
+        os.path.join(os.path.dirname(os.path.abspath(
+            sys.executable if getattr(sys, 'frozen', False) else __file__
+        )), "config.json"),
+        os.path.join(os.getcwd(), "config.json"),
+    ]:
+        if os.path.isfile(candidate):
+            try:
+                with open(candidate, "r", encoding="utf-8") as _f:
+                    return json.load(_f)
+            except Exception:
+                pass
+    return {}
+
+
+_APP_CONFIG: dict = _load_app_config()
+_GRAFIK_FILTER = "Pliki grafiku (*.grafik);;JSON (*.json);;Wszystkie pliki (*)"
 
 # --- KONFIGURACJA DNI I LOKALIZACJI ---
 DAYS_CONFIG = {
@@ -1081,114 +1102,63 @@ Zwróć TYLKO JSON jako listę komend, bez żadnych wyjaśnień."""
                 self.error_occurred.emit(f"Błąd AI: {err}")
 
 # --- AUTO-UPDATER ---
-class UpdateChecker(QThread):
-    """Sprawdza najnowszą wersję na GitHub Releases (w tle)."""
-    update_available = Signal(str, str, str)  # (new_version, download_url, release_notes)
-    no_update = Signal()
-    check_failed = Signal(str)
+class ScriptUpdater(QThread):
+    """
+    Pobiera nową wersję main.py z GitHub Raw i zapisuje ją do
+    %LOCALAPPDATA%/ShiftFlow/. Bootstrap załaduje ją przy kolejnym starcie.
+    Nie wymaga przebudowy .exe.
+    """
+    # (new_version)  — nowa wersja została pobrana
+    updated   = Signal(str)
+    # (current_version) — jesteśmy aktualni
+    up_to_date = Signal(str)
+    failed    = Signal(str)
+
+    _GITHUB_RAW = f"https://raw.githubusercontent.com/{GITHUB_REPO}/main"
+    _APP_DIR = os.path.join(
+        os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), "ShiftFlow"
+    )
 
     def run(self):
         import urllib.request
-        import urllib.error
+        raw = self._GITHUB_RAW
         try:
-            url = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-            req = urllib.request.Request(url, headers={
-                "Accept": "application/vnd.github+json",
-                "User-Agent": "ShiftFlow-Updater"
-            })
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                data = json.loads(resp.read().decode())
+            # 1. Sprawdź wersję
+            req = urllib.request.Request(
+                f"{raw}/version.txt",
+                headers={"User-Agent": "ShiftFlow-Updater"},
+            )
+            with urllib.request.urlopen(req, timeout=8) as r:
+                remote_ver = r.read().decode().strip()
 
-            tag = data.get("tag_name", "").lstrip("vV")
-            if not tag:
-                self.no_update.emit()
+            def _parts(v: str) -> list:
+                return [int(x) for x in _re.findall(r"\d+", v)]
+
+            if not (_parts(remote_ver) > _parts(__version__)):
+                self.up_to_date.emit(__version__)
                 return
 
-            if self._is_newer(tag, __version__):
-                # Szukaj assetu .exe
-                dl_url = ""
-                for asset in data.get("assets", []):
-                    if asset["name"].lower().endswith(".exe"):
-                        dl_url = asset["browser_download_url"]
-                        break
-                if dl_url:
-                    notes = data.get("body", "") or ""
-                    self.update_available.emit(tag, dl_url, notes)
-                else:
-                    self.no_update.emit()
-            else:
-                self.no_update.emit()
+            # 2. Pobierz main.py (~100 KB)
+            req2 = urllib.request.Request(
+                f"{raw}/main.py",
+                headers={"User-Agent": "ShiftFlow-Updater"},
+            )
+            with urllib.request.urlopen(req2, timeout=30) as r:
+                data = r.read()
+
+            # 3. Zapisz atomowo
+            os.makedirs(self._APP_DIR, exist_ok=True)
+            dest = os.path.join(self._APP_DIR, "main.py")
+            tmp  = dest + ".tmp"
+            with open(tmp, "wb") as f:
+                f.write(data)
+            os.replace(tmp, dest)
+            with open(os.path.join(self._APP_DIR, "version.txt"), "w") as f:
+                f.write(remote_ver)
+
+            self.updated.emit(remote_ver)
         except Exception as e:
-            self.check_failed.emit(str(e))
-
-    @staticmethod
-    def _is_newer(remote: str, local: str) -> bool:
-        def _parts(v):
-            return [int(x) for x in _re.findall(r'\d+', v)]
-        return _parts(remote) > _parts(local)
-
-
-class UpdateDownloader(QThread):
-    """Pobiera plik .exe i raportuje postęp."""
-    progress = Signal(int, int)        # (bytes_downloaded, total_bytes)
-    download_finished = Signal(str)    # ścieżka do pobranego pliku
-    download_failed = Signal(str)
-
-    def __init__(self, url: str, parent=None):
-        super().__init__(parent)
-        self.url = url
-
-    def run(self):
-        import urllib.request
-        import urllib.error
-        try:
-            req = urllib.request.Request(self.url, headers={
-                "User-Agent": "ShiftFlow-Updater"
-            })
-            with urllib.request.urlopen(req, timeout=120) as resp:
-                total = int(resp.headers.get("Content-Length", 0))
-                dest = os.path.join(tempfile.gettempdir(), "ShiftFlow_update.exe")
-                downloaded = 0
-                with open(dest, "wb") as f:
-                    while True:
-                        chunk = resp.read(65536)
-                        if not chunk:
-                            break
-                        f.write(chunk)
-                        downloaded += len(chunk)
-                        self.progress.emit(downloaded, total)
-            self.download_finished.emit(dest)
-        except Exception as e:
-            self.download_failed.emit(str(e))
-
-
-def _spawn_swapper_and_exit(new_exe_path: str):
-    """Tworzy tymczasowy .bat, który podmienia EXE i uruchamia nową wersję."""
-    if getattr(sys, 'frozen', False):
-        current_exe = sys.executable
-    else:
-        # Tryb deweloperski — nie ma EXE do podmiany
-        return
-
-    bat = os.path.join(tempfile.gettempdir(), "shiftflow_update.bat")
-    script = f'''@echo off
-title ShiftFlow Updater
-echo Aktualizacja ShiftFlow...
-ping 127.0.0.1 -n 3 > nul
-del /f /q "{current_exe}"
-move /y "{new_exe_path}" "{current_exe}"
-start "" "{current_exe}"
-del /f /q "%~f0"
-'''
-    with open(bat, "w", encoding="utf-8") as f:
-        f.write(script)
-
-    subprocess.Popen(
-        ["cmd.exe", "/c", bat],
-        creationflags=subprocess.CREATE_NO_WINDOW | subprocess.DETACHED_PROCESS,
-        close_fds=True
-    )
-    QApplication.quit()
+            self.failed.emit(str(e))
 
 
 # --- GŁÓWNE OKNO APLIKACJI ---
@@ -1196,9 +1166,12 @@ class ScheduleApp(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("ShiftFlow - AI Work Scheduler")
-        self.setGeometry(100, 100, 1200, 600)
+        self._apply_startup_geometry()
         self.setStyleSheet(qdarkstyle.load_stylesheet())
-        
+
+        self._project_file: str | None = None
+        self._unsaved = False
+
         self.model = ScheduleTableModel()
         self.ai_worker = None
         self.brain_memory = BrainMemory()
@@ -1212,19 +1185,15 @@ class ScheduleApp(QMainWindow):
 
         self.model.state_about_to_change.connect(self.on_model_about_to_change)
         self.model.state_changed.connect(self.on_model_state_changed)
+        self.model.state_changed.connect(self._mark_dirty)
 
         self._setup_ui()
 
         self.statusBar().showMessage("System gotowy")
         self.set_ai_status("AI: gotowe", "#00FF00")
-
-        # --- Auto-update check (w tle) ---
-        self._update_checker = UpdateChecker()
-        self._update_checker.update_available.connect(self._on_update_available)
-        # 404 = repo nie istnieje jeszcze — cicho ignoruj
-        self._update_checker.check_failed.connect(
-            lambda e: None if "404" in str(e) else self._log(f"Sprawdzanie aktualizacji: {e}"))
-        self._update_checker.start()
+        # Bootstrap obsługuje auto-aktualizację main.py przy każdym uruchomieniu.
+        # Tutaj przechowujemy referencje do manualne sprawdzenia w panelu.
+        self._script_updater: ScriptUpdater | None = None
     
     def _setup_ui(self):
         """Zbuduj interfejs użytkownika"""
@@ -1268,7 +1237,32 @@ class ScheduleApp(QMainWindow):
         dock = QDockWidget("Panel Kontrolny", self)
         dock_widget = QWidget()
         dock_layout = QVBoxLayout(dock_widget)
-        
+
+        # ── PLIK / ZAPIS I ODCZYT ─────────────────────────────────────────
+        dock_layout.addWidget(QLabel("--- PLIK ---"))
+
+        btn_new = QPushButton("📄  Nowy grafik")
+        btn_new.clicked.connect(self.new_project)
+        dock_layout.addWidget(btn_new)
+
+        btn_save = QPushButton("💾  Zapisz  (Ctrl+S)")
+        btn_save.clicked.connect(self.save_project)
+        dock_layout.addWidget(btn_save)
+
+        btn_save_as = QPushButton("💾  Zapisz jako…  (Ctrl+Shift+S)")
+        btn_save_as.clicked.connect(self.save_project_as)
+        dock_layout.addWidget(btn_save_as)
+
+        btn_open = QPushButton("📂  Otwórz…  (Ctrl+O)")
+        btn_open.clicked.connect(self.open_project)
+        dock_layout.addWidget(btn_open)
+
+        # Skróty klawiaturowe
+        QShortcut(QKeySequence("Ctrl+S"), self).activated.connect(self.save_project)
+        QShortcut(QKeySequence("Ctrl+Shift+S"), self).activated.connect(self.save_project_as)
+        QShortcut(QKeySequence("Ctrl+O"), self).activated.connect(self.open_project)
+        QShortcut(QKeySequence("Ctrl+N"), self).activated.connect(self.new_project)
+
         # ── SIATA / WIERSZE I KOLUMNY ────────────────────────────────────
         dock_layout.addWidget(QLabel("--- SIATKA ---"))
 
@@ -1374,14 +1368,18 @@ class ScheduleApp(QMainWindow):
         btn_export_word = QPushButton("Eksportuj do Word")
         btn_export_word.clicked.connect(self.export_to_word)
         dock_layout.addWidget(btn_export_word)
-        
+
         # Log
         dock_layout.addWidget(QLabel("\n--- STATUS ---"))
         self.status_log = QTextEdit()
         self.status_log.setReadOnly(True)
         self.status_log.setMaximumHeight(100)
         dock_layout.addWidget(self.status_log)
-        
+
+        btn_check_update = QPushButton("🔄  Sprawdź aktualizacje")
+        btn_check_update.clicked.connect(self.check_for_updates_manual)
+        dock_layout.addWidget(btn_check_update)
+
         dock_layout.addStretch()
         
         dock.setWidget(dock_widget)
@@ -1692,6 +1690,137 @@ class ScheduleApp(QMainWindow):
         self.ai_status_label.setText(text)
         self.ai_status_label.setStyleSheet(f"font-weight: bold; color: {color};")
 
+    # ── STARTUP GEOMETRY ──────────────────────────────────────────────────
+
+    def _apply_startup_geometry(self):
+        """Ustaw rozmiar okna w oparciu o dostępne miejsce na ekranie."""
+        screen = QApplication.primaryScreen()
+        if screen:
+            geom = screen.availableGeometry()
+            cfg = _APP_CONFIG.get("window", {})
+            w = int(geom.width()  * cfg.get("width_ratio",  0.85))
+            h = int(geom.height() * cfg.get("height_ratio", 0.85))
+            x = geom.x() + (geom.width()  - w) // 2
+            y = geom.y() + (geom.height() - h) // 2
+            self.setGeometry(x, y, w, h)
+        else:
+            self.setGeometry(100, 100, 1200, 700)
+
+    # ── ZARZĄDZANIE PLIKIEM PROJEKTU ──────────────────────────────────────
+
+    def _update_title(self):
+        name = os.path.basename(self._project_file) if self._project_file else "Bez nazwy"
+        dirty = " *" if self._unsaved else ""
+        self.setWindowTitle(f"ShiftFlow — {name}{dirty}")
+
+    def _mark_dirty(self, _state=None):
+        if not self._unsaved:
+            self._unsaved = True
+            self._update_title()
+
+    def new_project(self):
+        if self._unsaved:
+            reply = QMessageBox.question(
+                self, "Niezapisane zmiany",
+                "Masz niezapisane zmiany. Zapisać przed stworzeniem nowego grafiku?",
+                QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel,
+            )
+            if reply == QMessageBox.Save:
+                self.save_project()
+                if self._unsaved:   # zapis anulowany
+                    return
+            elif reply == QMessageBox.Cancel:
+                return
+        empty: dict = {"headers": ["Pracownik"], "rows": [], "spans": []}
+        self._history_enabled = False
+        try:
+            self.model.set_state(empty)
+        finally:
+            self._history_enabled = True
+        self.undo_stack.clear()
+        self._project_file = None
+        self._unsaved = False
+        self._update_title()
+        self._log("✓ Nowy grafik")
+
+    def save_project(self):
+        if not self._project_file:
+            self.save_project_as()
+            return
+        self._write_project(self._project_file)
+
+    def save_project_as(self):
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Zapisz projekt", "", _GRAFIK_FILTER
+        )
+        if path:
+            self._write_project(path)
+
+    def _write_project(self, path: str):
+        try:
+            data = self.model.get_state()
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+            self._project_file = path
+            self._unsaved = False
+            self._update_title()
+            self._log(f"✓ Zapisano: {os.path.basename(path)}")
+        except OSError as e:
+            QMessageBox.critical(self, "Błąd zapisu", str(e))
+
+    def open_project(self):
+        if self._unsaved:
+            reply = QMessageBox.question(
+                self, "Niezapisane zmiany",
+                "Masz niezapisane zmiany. Zapisać przed otwarciem innego pliku?",
+                QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel,
+            )
+            if reply == QMessageBox.Save:
+                self.save_project()
+                if self._unsaved:
+                    return
+            elif reply == QMessageBox.Cancel:
+                return
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Otwórz projekt", "", _GRAFIK_FILTER
+        )
+        if not path:
+            return
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            self._history_enabled = False
+            try:
+                self.model.set_state(data)
+            finally:
+                self._history_enabled = True
+            self.undo_stack.clear()
+            self._project_file = path
+            self._unsaved = False
+            self._update_title()
+            self._log(f"✓ Otwarto: {os.path.basename(path)}")
+        except (OSError, json.JSONDecodeError) as e:
+            QMessageBox.critical(self, "Błąd otwarcia", str(e))
+
+    def closeEvent(self, event):
+        if self._unsaved:
+            reply = QMessageBox.question(
+                self, "Niezapisane zmiany",
+                "Masz niezapisane zmiany. Zapisać przed zamknięciem?",
+                QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel,
+            )
+            if reply == QMessageBox.Save:
+                self.save_project()
+                event.accept()
+            elif reply == QMessageBox.Discard:
+                event.accept()
+            else:
+                event.ignore()
+        else:
+            event.accept()
+
+    # ── AKCJE OGÓLNE ──────────────────────────────────────────────────────
+
     def perform_action(self, func, *args, **kwargs):
         func(*args, **kwargs)
         self.update_undo_redo_buttons()
@@ -1973,55 +2102,44 @@ class ScheduleApp(QMainWindow):
                     return True
         return super().eventFilter(obj, event)
 
-    # --- AUTO-UPDATE HANDLERS ---
+    # --- AUTO-UPDATE HANDLERS (script-based) ---
 
-    def _on_update_available(self, version, url, notes):
-        """Pokaż dialog z informacją o nowej wersji."""
-        msg = (f"Dostępna nowa wersja: v{version}\n"
-               f"Obecna wersja: v{__version__}\n\n"
-               f"{notes[:300]}{'…' if len(notes) > 300 else ''}\n\n"
-               "Pobrać i zainstalować aktualizację?")
-        reply = QMessageBox.question(
-            self, "Aktualizacja ShiftFlow", msg,
-            QMessageBox.Yes | QMessageBox.No)
-        if reply == QMessageBox.Yes:
-            self._start_download(url)
+    def check_for_updates_manual(self):
+        """
+        Pobierz nową wersję main.py z GitHub Raw (ręcznie, przez przycisk).
+        Po pobraniu wystarczy zrestartować aplikację — bootstrap załaduje nowy skrypt.
+        """
+        if self._script_updater and self._script_updater.isRunning():
+            return
+        self._log("🔄 Sprawdzanie aktualizacji skryptu…")
+        self.set_ai_status("Sprawdzanie…", "#FFA500")
+        self._script_updater = ScriptUpdater()
+        self._script_updater.updated.connect(self._on_script_updated)
+        self._script_updater.up_to_date.connect(self._on_script_up_to_date)
+        self._script_updater.failed.connect(self._on_script_update_failed)
+        self._script_updater.start()
 
-    def _start_download(self, url):
-        """Rozpocznij pobieranie z paskiem postępu."""
-        self._progress = QProgressDialog(
-            "Pobieranie aktualizacji…", "Anuluj", 0, 100, self)
-        self._progress.setWindowTitle("Aktualizacja ShiftFlow")
-        self._progress.setMinimumDuration(0)
-        self._progress.setValue(0)
-
-        self._downloader = UpdateDownloader(url)
-        self._downloader.progress.connect(self._on_download_progress)
-        self._downloader.download_finished.connect(self._on_download_finished)
-        self._downloader.download_failed.connect(self._on_download_failed)
-        self._progress.canceled.connect(self._downloader.terminate)
-        self._downloader.start()
-
-    def _on_download_progress(self, downloaded, total):
-        if total > 0:
-            self._progress.setValue(int(downloaded * 100 / total))
-        self._progress.setLabelText(
-            f"Pobieranie… {downloaded // 1024} / {total // 1024} KB")
-
-    def _on_download_finished(self, path):
-        self._progress.close()
-        self._log(f"✓ Pobrano aktualizację: {path}")
+    def _on_script_updated(self, new_ver: str):
+        self._log(f"✓ Zaktualizowano do v{new_ver} — zrestartuj aplikację, by wczytać zmiany.")
+        self.set_ai_status("Aktualizacja gotowa — restart!", "#FFA500")
+        self.statusBar().showMessage(
+            f"ShiftFlow v{new_ver} gotowa — zamknij i otwórz ponownie.", 0)
         reply = QMessageBox.information(
-            self, "Aktualizacja gotowa",
-            "Pobieranie zakończone. Aplikacja zostanie zrestartowana.",
-            QMessageBox.Ok)
-        _spawn_swapper_and_exit(path)
+            self,
+            "Aktualizacja gotowa",
+            f"Pobrano ShiftFlow v{new_ver}.\n"
+            "Zamknij i uruchom aplikację ponownie, by zastosować zmiany.",
+            QMessageBox.Ok,
+        )
 
-    def _on_download_failed(self, error):
-        self._progress.close()
-        self._log(f"❌ Błąd pobierania aktualizacji: {error}")
-        QMessageBox.critical(self, "Błąd aktualizacji",
-                             f"Nie udało się pobrać aktualizacji:\n{error}")
+    def _on_script_up_to_date(self, ver: str):
+        self._log(f"✓ Wersja v{ver} jest aktualna.")
+        self.set_ai_status("AI: gotowe", "#00FF00")
+        self.statusBar().showMessage(f"ShiftFlow v{ver} — brak aktualizacji.", 5000)
+
+    def _on_script_update_failed(self, error: str):
+        self._log(f"❌ Aktualizacja skryptu nie powiodła się: {error}")
+        self.set_ai_status("AI: gotowe", "#00FF00")
 
     def _log(self, message):
         """Dodaj wiadomość do loga statusu"""
@@ -2036,7 +2154,10 @@ if __name__ == "__main__":
     app = QApplication.instance() or QApplication(sys.argv)
     try:
         window = ScheduleApp()
-        window.show()
+        if _APP_CONFIG.get("start_maximized", True):
+            window.showMaximized()
+        else:
+            window.show()
         sys.exit(app.exec())
     except Exception as exc:
         import traceback

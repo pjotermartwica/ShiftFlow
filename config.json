@@ -1,4 +1,10 @@
 {
+  "start_maximized": true,
+  "auto_update": true,
+  "window": {
+    "width_ratio": 0.85,
+    "height_ratio": 0.85
+  },
   "departments": {
     "Szkoła": {
       "num_people": 30,
