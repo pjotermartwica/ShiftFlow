@@ -7,6 +7,41 @@ import tempfile
 import subprocess
 import re as _re
 
+
+def _configure_windows_dpi_awareness() -> None:
+    """Ustaw DPI awareness procesu zanim Qt utworzy QApplication."""
+    if os.name != "nt":
+        return
+
+    os.environ.setdefault("QT_ENABLE_HIGHDPI_SCALING", "1")
+    os.environ.setdefault("QT_AUTO_SCREEN_SCALE_FACTOR", "1")
+    os.environ.setdefault("QT_SCALE_FACTOR_ROUNDING_POLICY", "PassThrough")
+
+    try:
+        import ctypes
+
+        user32 = ctypes.windll.user32
+        shcore = getattr(ctypes.windll, "shcore", None)
+
+        # Windows 10+: Per-monitor v2 DPI awareness.
+        if hasattr(user32, "SetProcessDpiAwarenessContext"):
+            user32.SetProcessDpiAwarenessContext(ctypes.c_void_p(-4))
+            return
+
+        # Windows 8.1 fallback: per-monitor DPI awareness.
+        if shcore and hasattr(shcore, "SetProcessDpiAwareness"):
+            shcore.SetProcessDpiAwareness(2)
+            return
+
+        # Legacy fallback.
+        if hasattr(user32, "SetProcessDPIAware"):
+            user32.SetProcessDPIAware()
+    except Exception:
+        pass
+
+
+_configure_windows_dpi_awareness()
+
 # Globalny hook dla nieobsłużonych wyjątków (widoczny w .exe bez konsoli)
 def _excepthook(etype, value, tb):
     import traceback
@@ -56,7 +91,7 @@ sys.excepthook = _excepthook
 import openpyxl
 from dotenv import dotenv_values
 
-__version__ = "1.0.12"
+__version__ = "1.0.13"
 GITHUB_REPO = "pjotermartwica/ShiftFlow"
 
 def _collect_env_paths():
